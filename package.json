@@ -1,0 +1,17 @@
+{
+  "name": "trikon-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Henit Chobisa",
+  "license": "ISC",
+  "dependencies": {
+    "joi": "^17.4.0",
+    "mongodb": "^3.6.9",
+    "mongoose": "^5.13.2",
+    "nodemon": "^2.0.9"
+  }
+}
