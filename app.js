@@ -4,7 +4,7 @@ const Joi = require('joi');
 const mongoose = require('mongoose');
 const assert =  require('assert');
 const { ObjectID } = require('mongodb');
-const { collection } = require('./schemas');
+const Order = require('./orderModel');
 
 const uri = "mongodb+srv://HenitChobisa:111.Dinesh@cluster0.o7gh0.mongodb.net/Trikon?retryWrites=true&w=majority";
 const app = express();
@@ -18,8 +18,46 @@ const client = new MongoClient(uri, {
 
 // Generate order to the database
 
+const statusRules = (value, helpers) => {
+    if (value === 'Not Yet Dispatched' || value === 'Dispatched' || value === 'Shipped' || value === 'Out for delivery' || value === 'Delivered' || value === 'Returned'){
+        return value;
+    }
+    else {
+        throw new Error('of Bad Status, Review! \n Not Yet Dispatched\n Dispatched\n Shipped\n Out for delivery\n Delivered\n Returned')
+    }
+    
+}
+
+const orderSchema = Joi.object({
+    trackingID : Joi.number().max(999999999999).min(100000000000).required(),
+        orderInfo:{
+            orderInvoice : Joi.number().max(999999999999).min(100000000000).required(),
+            orderName : Joi.string().required(),
+            orderQuantity : Joi.number().min(1).required()
+        },
+        clientInfo:{
+            clientName : Joi.string().required(),
+            clientNumber : Joi.number().max(999999999999).min(100000000000).required(),
+            clientEmail : Joi.string().email().required(),
+            clientAddress : Joi.string().required(),
+            clientPincode : Joi.number().max(999999).min(100000).required()
+        },
+        orderStatus:{
+            currentStatus : Joi.string().lowercase().custom(statusRules,'custom validation').required(),
+            lastLocation : Joi.string().required()
+        }
+})
+
+
 
 app.post('/api/generateOrder', (req, res) => {
+
+    const result = orderSchema.validate(req.body);
+
+    if(result.error){
+        res.status(400).send(result.error.details[0].message);
+        return;
+    };
     
     const doc =  {
         trackingID : req.body.trackingID,
@@ -40,7 +78,6 @@ app.post('/api/generateOrder', (req, res) => {
             lastLocation : req.body.orderStatus.lastLocation,
         }
     };
-    
     
     postToDatabase(doc);
     res.json(doc);
@@ -90,6 +127,10 @@ app.get("/api/getOrderInfo/:trackingID", async (req, res) => {
     })
 });
 
+const trackingIDValidation = Joi.object({
+    trackingID : Joi.number().max(999999999999).min(100000000000).required()
+})
+
 // Getting current order Status from the tracking ID
 
 app.get("/api/getOrderStatus/:trackingID", async (req, res) => {
@@ -97,16 +138,21 @@ app.get("/api/getOrderStatus/:trackingID", async (req, res) => {
     await client.connect();
     const database = client.db('Trikon');
 
+    const result = trackingIDValidation.validate(req.params);
+
+    if(result.error){
+        res.status(400).send(result.error.details[0].message);
+        return;
+    };
+
     database.collection('Orders').find({
         trackingID : req.params.trackingID
 
     }).toArray((err, results) => {
-
         if (err){
             console.log(err);
             return;
         }
-        
         const status = results.find((result) => {
             res.json(result.orderStatus.currentStatus);
         });
@@ -118,6 +164,13 @@ app.get("/api/getOrderStatus/:trackingID", async (req, res) => {
 app.put("/api/update/:trackingID", async (req, res) => {
     await client.connect();
     const database = client.db('Trikon');
+    const result = trackingIDValidation.validate(req.params);
+
+    if(result.error){
+        res.status(400).send(result.error.details[0].message);
+        return;
+    };
+
     const query = {
         trackingID : req.params.trackingID
     }
@@ -128,9 +181,17 @@ app.put("/api/update/:trackingID", async (req, res) => {
         }
     }}
     const options = {};
-    database.collection('Orders').updateOne(query,update,options);
-
+    const document = database.collection('Orders').find(query).toArray((err, result) => {
+        if (err){
+            res.status(404).send('Woops, internal error!')
+        }
+        else{
+            database.collection('Orders').updateOne(query,update,options);
+            res.send('The order status has been updated');
+        }
+    })
 });
 
 
-app.listen(3000, () => {console.log('Listening at port 3000')});
+const port = process.env.port || 8082
+app.listen(port, () => {console.log(`Listening at port ${port}`)});
