@@ -4,7 +4,21 @@ const Joi = require('joi');
 const mongoose = require('mongoose');
 const assert =  require('assert');
 const { ObjectID } = require('mongodb');
-const Order = require('./orderModel');
+const jwt = require ('jsonwebtoken')
+const bodyParser = require('body-parser');
+
+
+const users = [
+    {
+        username: 'john',
+        password: 'password123admin',
+        role: 'admin'
+    }, {
+        username: 'anna',
+        password: 'password123member',
+        role: 'member'
+    }
+];
 
 const uri = "mongodb+srv://HenitChobisa:111.Dinesh@cluster0.o7gh0.mongodb.net/Trikon?retryWrites=true&w=majority";
 const app = express();
@@ -13,6 +27,47 @@ const client = new MongoClient(uri, {
     useNewUrlParser : true,
     useUnifiedTopology : true,
 });
+
+app.use(bodyParser.json());
+const accessTokenSecret = 'bfwbfwefewjfewhfkweroitj4witji42jtniwitvjwutw094eut0w4u'
+
+// authSystem 
+app.post('/login', (req,res) => {
+    const username = req.body.username;
+    const password = req.body.password;
+
+    const user = users.find(u => {return u.username === username, u.password === password});
+    console.log(user);
+
+    if(user){
+        const accessToken = jwt.sign({username : user.username ,role : user.role}, accessTokenSecret);
+        console.log(accessToken);
+        res.json({
+            accessToken
+        });
+    }
+    else {
+        res.send('User does not exist')
+    }
+});
+
+const authenticateJWT = (req,res,next) => {
+    const authHeader = req.headers.authorization;
+
+    if(authHeader) {
+        const token = authHeader.split(' ')[1];
+        jwt.verify(token, accessTokenSecret, (err, user) => {
+            if (err) {
+                res.send('You are not an authenticated User, get lost!');
+            }
+            req.user = user;
+            next();
+        });
+    }
+    else {
+        res.status(404);
+    }
+}
 
 
 
@@ -94,7 +149,7 @@ async function postToDatabase(document){
 
 // Get all data
 
-app.get('/api/getData', async (req,res) => {
+app.get('/api/getData',authenticateJWT,async (req,res) => {
     await client.connect();
     const database = client.db("Trikon");
     database.collection('Orders').find({}).toArray((err,results) => {
