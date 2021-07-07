@@ -21,7 +21,7 @@ const accessTokenSecret = 'bfwbfwefewjfewhfkweroitj4witji42jtniwitvjwutw094eut0w
 const refreshTokenSecret = 'ncruw9u9u2r90nu2n9ru24ur490niu43nut934ntn43tvn3424i34ir2'
 const refreshTokens = []
 
-app.post('/token', (req, res) => {
+app.post('/api/token', (req, res) => {
     const { token } = req.body;
 
     if (!token) {
